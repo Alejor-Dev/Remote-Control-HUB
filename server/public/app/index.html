@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>Remote Control Hub</title>
+  <link rel="manifest" href="/app/manifest.webmanifest" />
+  <link rel="icon" href="/app/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/app/css/app.css" />
+</head>
+<body>
+  <div id="root">
+    <header class="topbar">
+      <span id="statusDot" class="dot"></span>
+      <div style="flex:1;min-width:0">
+        <div class="title" id="statusTitle">Remote Control Hub</div>
+        <div class="sub" id="statusSub">Conectando…</div>
+      </div>
+      <button id="btnHome" class="btn" style="padding:8px;width:auto;font-size:13px;flex:0">Inicio</button>
+    </header>
+
+    <main>
+      <section id="view-connect" class="content"></section>
+      <section id="view-touchpad" class="content">
+        <div class="view-title">Touchpad</div>
+        <div class="tab-box card"><div class="touchpad" id="touchpad"><div class="hint">Mové un dedo para mover el cursor.<br>Tap = clic · Doble tap = doble clic.<br>Dos dedos = scroll.</div></div></div>
+        <div class="btn-row" style="margin-top:10px">
+          <button id="btnDrag" class="btn">Arrastrar</button>
+          <button id="btnScrollInvert" class="btn">Scroll</button>
+        </div>
+      </section>
+      <section id="view-keyboard" class="content"></section>
+      <section id="view-mic" class="content"></section>
+      <section id="view-media" class="content"></section>
+      <section id="view-settings" class="content"></section>
+    </main>
+
+    <nav class="nav" id="nav">
+      <button data-view="touchpad" class="active"><span class="ic">🖱</span>Touchpad</button>
+      <button data-view="keyboard"><span class="ic">⌨</span>Teclado</button>
+      <button data-view="mic"><span class="ic">🎙</span>Micrófono</button>
+      <button data-view="media"><span class="ic">🎵</span>Media</button>
+      <button data-view="settings"><span class="ic">⚙</span>Ajustes</button>
+    </nav>
+  </div>
+
+  <div id="overlay" class="overlay hidden"></div>
+
+  <script type="module" src="/app/js/app.js"></script>
+</body>
+</html>
