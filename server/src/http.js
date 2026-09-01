@@ -59,14 +59,16 @@ export class HttpServer {
     res.end(payload);
   }
 
-  #page(res, file) {
+  #page(res, file, noCache = false) {
     fs.readFile(file, (err, data) => {
       if (err) {
         res.writeHead(404);
         res.end('not found');
         return;
       }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+      const headers = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' };
+      if (noCache) headers['Cache-Control'] = 'no-cache, must-revalidate';
+      res.writeHead(200, headers);
       res.end(data);
     });
   }
@@ -113,14 +115,14 @@ export class HttpServer {
         let rel = p.slice(4).replace(/\\/g, '/').replace(/^\/+/, '') || 'index.html';
         const file = path.join(APP_DIR, rel);
         if (!file.startsWith(APP_DIR)) return this.#json(res, 403, { error: 'forbidden' });
-        return this.#page(res, file);
+        return this.#page(res, file, true);
       }
 
       if (req.method === 'GET' && p.startsWith('/shared/')) {
         const rel = p.slice('/shared/'.length).replace(/^\/+/, '') || 'protocol.js';
         const file = path.join(SHARED_DIR, rel.replace(/\\/g, '/'));
         if (!file.startsWith(SHARED_DIR)) return this.#json(res, 403, { error: 'forbidden' });
-        return this.#page(res, file);
+        return this.#page(res, file, true);
       }
 
       // --- API ---

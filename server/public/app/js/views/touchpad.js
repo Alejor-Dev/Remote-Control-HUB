@@ -41,6 +41,7 @@ export function initTouchpad() {
 
   function down(e) {
     pad.classList.add('active');
+    idle = false;
     const p = { x: e.clientX, y: e.clientY, moved: 0, downAt: Date.now() };
     pointers.set(e.pointerId, p);
     if (pointers.size === 1 && can('mouse')) {
