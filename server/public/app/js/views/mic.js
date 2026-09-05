@@ -73,6 +73,12 @@ export function initMic(root) {
     if (m.t === 'audio.ready') {
       awaitingReady = false;
       statusEl.textContent = 'Transmitiendo…';
+    } else if (m.t === 'error' && awaitingReady && active) {
+      awaitingReady = false;
+      cleanupStream();
+      setStatus('Error de audio en la PC: ' + (m.message || m.e || 'error'), '#ffb3b3');
+      toggle.textContent = 'Usar celular como micrófono';
+      toggle.classList.add('primary');
     }
   });
 

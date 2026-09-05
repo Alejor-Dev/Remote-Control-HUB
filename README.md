@@ -86,9 +86,22 @@ npm start
 
 Se abre el **panel de la PC** en el navegador (o entrá a `http://IP_LAN:8742`).
 
+> ⚠️ **Micrófono del celular requiere HTTPS.** Los navegadores solo exponen
+> `navigator.mediaDevices`/`getUserMedia` en contextos seguros; por HTTP la PWA
+> no puede capturar audio. Ejecutá con TLS y usá la URL `https://IP_LAN:8743/app`:
+>
+> ```powershell
+> $env:RCH_TLS="true"
+> npm start
+> ```
+>
+> El certificado es autofirmado (se genera solo en `server/data/tls/`): en el
+> celular tocá **Avanzado → Continuar de todos modos** la primera vez, y rehacé
+> el emparejamiento porque el origen cambió.
+
 ### Emparejar el celular
 
-1. En el celular abrí `http://IP_LAN:8742/app` (o escaneá el **código QR** del panel).
+1. En el celular abrí `https://IP_LAN:8743/app` (o escaneá el **código QR** del panel, que ya apunta a HTTPS).
 2. Tocá **Emparejar con mi PC**.
 3. En la PC: en el panel → sección **Emparejamiento** → **Aprobar** (el código se muestra en ambas pantallas).
 4. En el celular: tocá **Ya lo aprobé en la PC**.
@@ -123,8 +136,10 @@ permisos, streaming de audio capturado a WAV válido, y revocación de tokens.
 | Variable | Default | Descripción |
 |---|---|---|
 | `RCH_HOST` | `0.0.0.0` | Interfaz de escucha |
-| `RCH_PORT` | `8742` | Puerto HTTP/WebSocket |
-| `RCH_DATA_DIR` | `server/data` | Dónde persiste `devices.json` y el `.raw` de captura |
+| `RCH_PORT` | `8742` | Puerto HTTP/WebSocket (panel de la PC) |
+| `RCH_TLS` | `false` | `true`: agrega HTTPS en `RCH_TLS_PORT` con certificado autofirmado |
+| `RCH_TLS_PORT` | `8743` | Puerto HTTPS para el cliente móvil |
+| `RCH_DATA_DIR` | `server/data` | Dónde persiste `devices.json`, el `.raw` de captura y el cert TLS |
 | `RCH_INPUT_DRY_RUN` | `false` | `true`: registra eventos de input, no los ejecuta |
 | `RCH_AUDIO_DRY_RUN` | `false` | `true`: guarda el audio a `capture.raw` en vez de reproducirlo |
 | `RCH_AUDIO_DEVICE` | `-1` | Índice del dispositivo de salida (WAVE_MAPPER = -1). Listarlos: `listWindowsAudioDevices()` / panel |
@@ -165,6 +180,10 @@ Canal de texto = JSON `{t, ...}`. Canal binario = PCM16 LE del micrófono.
   "Agregar a pantalla de inicio" con un navegador moderno.
 - La reproducción de audio usa `waveOut`; si la red va más rápida que la salida,
   se descartan bloques excedentes para no acumular memoria (política de drop).
+- Al primer uso del micrófono, el servidor compila `helpers/wavesink.cs` a un DLL
+  (`csc.exe` → `data/wavesink.dll`) y el helper solo lo carga (`Add-Type -Path`).
+  Esto evita el bug de PowerShell 5.1 donde compilar (`Add-Type -TypeDefinition`)
+  con el stdin redirigido corrompe el handle y el helper lee EOF al instante.
 - El arranque de PowerShell (~1 s) se amortiza manteniendo el helper vivo en modo
   reproducción; el **primer** uso del micrófono puede tardar ese segundo.
 - Candado de teclas con modificadores + combinaciones se resuelve en el cliente

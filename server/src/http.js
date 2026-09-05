@@ -1,10 +1,12 @@
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
 import { config, ensureDataDir } from './config.js';
 import { getLocalIPv4s } from './ip.js';
+import { getTlsOptions } from './tls.js';
 import { listWindowsAudioDevices } from './audio/sink.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -36,13 +38,38 @@ export class HttpServer {
 
   start() {
     this.server = http.createServer((req, res) => this.#handle(req, res));
+    this.tlsServer = null;
+    const tlsOptions = getTlsOptions();
+    if (tlsOptions) {
+      this.tlsServer = https.createServer(tlsOptions, (req, res) => this.#handle(req, res));
+    }
     return new Promise((resolve) => {
-      this.server.listen(config.port, config.host, () => resolve(this.server));
+      const listening = [this.server.listen(config.port, config.host)];
+      if (this.tlsServer) {
+        listening.push(this.tlsServer.listen(config.tlsPort, config.host));
+      }
+      Promise.all(
+        listening.map(
+          (srv) =>
+            new Promise((res) => {
+              srv.once('listening', res);
+              srv.once('error', res);
+            }),
+        ),
+      ).then(() => resolve(this.server));
     });
   }
 
   getUrls() {
     const ips = getLocalIPv4s();
+    const ip = ips[0]?.address || '127.0.0.1';
+    if (this.tlsServer) {
+      return {
+        ips: ips.map((i) => i.address),
+        hostname: `https://${ip}:${config.tlsPort}`,
+        httpHostname: `http://${ip}:${config.port}`,
+      };
+    }
     return {
       ips: ips.map((i) => i.address),
       hostname: `http://${ips[0]?.address || '127.0.0.1'}:${config.port}`,

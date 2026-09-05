@@ -20,6 +20,11 @@ function envBool(name, fallback) {
 const config = {
   host: process.env.RCH_HOST || '0.0.0.0',
   port: envNumber('RCH_PORT', 8742),
+  // HTTPS con certificado autogenerado: necesario para que el navegador del
+  // celular exponga navigator.mediaDevices (getUserMedia / micrófono), que solo
+  // existe en contextos seguros.
+  tls: envBool('RCH_TLS', false),
+  tlsPort: envNumber('RCH_TLS_PORT', 8743),
   dataDir: process.env.RCH_DATA_DIR || path.join(__dirname, '..', 'data'),
   // Uso real => false. En true, los eventos de input se loguean y NO se ejecutan:
   // sirve para pruebas seguras sin mover el mouse de la maquina.

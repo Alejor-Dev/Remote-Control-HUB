@@ -37,7 +37,8 @@ function hideOverlay() {
 
 function wsUrl() {
   const host = String(state.host).replace(/^https?:\/\//i, '').replace(/\/+$/, '');
-  return `ws://${host}/ws`;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${host}/ws`;
 }
 
 export function connect() {

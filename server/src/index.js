@@ -37,19 +37,20 @@ export async function start() {
   const server = await httpServer.start();
   appState.http = server;
 
-  const ws = new ControlServer({ httpServer: server, devices, pairing, input, audio, log });
+  const ws = new ControlServer({ httpServer: server, tlsServer: httpServer.tlsServer, devices, pairing, input, audio, log });
   ws.start();
   appState.ws = ws;
 
-  const { hostname } = httpServer.getUrls();
+  const { hostname, httpHostname } = httpServer.getUrls();
   log('info', `Remote Control Hub en ${hostname}`);
+  if (httpHostname) log('info', `Panel/QR en ${httpHostname}`);
   if (config.inputDryRun) log('warn', 'MODO PRUEBA input: los eventos NO se ejecutan en la PC');
   if (config.audioDryRun) log('warn', 'MODO PRUEBA audio: el audio se captura a data/capture.raw, no se reproduce');
 
   if (config.openBrowser && process.env.RCH_NO_OPEN !== '1') {
     setTimeout(() => {
       try {
-        spawn('cmd', ['/c', 'start', '', hostname], { windowsHide: true, detached: true, stdio: 'ignore' });
+        spawn('cmd', ['/c', 'start', '', httpHostname || hostname], { windowsHide: true, detached: true, stdio: 'ignore' });
       } catch (err) {
         log('debug', `no se pudo abrir el navegador: ${err.message}`);
       }

@@ -45,21 +45,27 @@ function makeRateLimiter(maxPerSec = 200, burst = 400) {
 }
 
 export class ControlServer {
-  constructor({ httpServer, devices, pairing, input, audio, log = () => {} }) {
+  constructor({ httpServer, tlsServer = null, devices, pairing, input, audio, log = () => {} }) {
     this.httpServer = httpServer;
+    this.tlsServer = tlsServer;
     this.devices = devices;
     this.pairing = pairing;
     this.input = input;
     this.audio = audio;
     this.log = log;
     this.sockets = new Map(); // ws -> { deviceId, allow }
+    this.wssList = [];
   }
 
   #heartbeatLoop = null;
 
   start() {
-    this.wss = new WebSocketServer({ server: this.httpServer, path: '/ws', maxPayload: MAX_TEXT_PAYLOAD });
-    this.wss.on('connection', (ws) => this.#onConnection(ws));
+    const servers = [this.httpServer, this.tlsServer].filter(Boolean);
+    for (const server of servers) {
+      const wss = new WebSocketServer({ server, path: '/ws', maxPayload: MAX_TEXT_PAYLOAD });
+      wss.on('connection', (ws) => this.#onConnection(ws));
+      this.wssList.push(wss);
+    }
     this.#heartbeatLoop = setInterval(() => this.#checkHealth(), 15_000);
     this.#heartbeatLoop.unref?.();
   }
@@ -75,6 +81,15 @@ export class ControlServer {
   }
 
   #onMessage(ws, ctx, data, isBinary) {
+    try {
+      this.#handleMessage(ws, ctx, data, isBinary);
+    } catch (err) {
+      this.log('error', `[ws] error procesando mensaje: ${err.stack}`);
+      this.#send(ws, { t: 'error', e: 'internal_error' });
+    }
+  }
+
+  #handleMessage(ws, ctx, data, isBinary) {
     if (!ctx.allow()) {
       this.#send(ws, { t: 'error', e: 'rate_limit' });
       ws.close(1008, 'rate limit');
@@ -118,7 +133,7 @@ export class ControlServer {
         this.#send(ws, { t: 'pong', at: Date.now() });
         break;
       case 'audio.start':
-        this.#handleAudioStart(ws, ctx, frame);
+        void this.#handleAudioStart(ws, ctx, frame);
         break;
       case 'audio.stop':
         this.audio.stop();
@@ -214,16 +229,23 @@ export class ControlServer {
     if (key) this.input.keyTap(key);
   }
 
-  #handleAudioStart(ws, ctx, frame) {
-    const device = this.devices.get(ctx.deviceId);
-    if (!device || !device.perms?.audio) return;
-    this.audio.start({ rate: AUDIO_FORMAT.rate, channels: AUDIO_FORMAT.channels, volume: frame.volume ?? 1 });
-    this.#send(ws, {
-      t: 'audio.ready',
-      rate: AUDIO_FORMAT.rate,
-      channels: AUDIO_FORMAT.channels,
-      sampleSize: 16,
-    });
+  async #handleAudioStart(ws, ctx, frame) {
+    try {
+      const device = this.devices.get(ctx.deviceId);
+      if (!device || !device.perms?.audio) return;
+      await this.audio.start({ rate: AUDIO_FORMAT.rate, channels: AUDIO_FORMAT.channels, volume: frame.volume ?? 1 });
+      if (ws.readyState === ws.OPEN) {
+        this.#send(ws, {
+          t: 'audio.ready',
+          rate: AUDIO_FORMAT.rate,
+          channels: AUDIO_FORMAT.channels,
+          sampleSize: 16,
+        });
+      }
+    } catch (err) {
+      this.log('error', `[ws] audio.start fallo: ${err.message}`);
+      this.#send(ws, { t: 'error', e: 'audio_init_failed', message: err.message });
+    }
   }
 
   #sendCtrlError(ctx, kind, t) {
@@ -249,25 +271,30 @@ export class ControlServer {
   }
 
   #checkHealth() {
-    for (const ws of this.wss.clients) {
-      if (!ws.isAlive) {
-        ws.terminate();
-        continue;
+    for (const wss of this.wssList) {
+      for (const ws of wss.clients) {
+        if (!ws.isAlive) {
+          ws.terminate();
+          continue;
+        }
+        ws.isAlive = false;
+        try {
+          ws.ping();
+        } catch {}
       }
-      ws.isAlive = false;
-      try {
-        ws.ping();
-      } catch {}
     }
   }
 
   stop() {
     clearInterval(this.#heartbeatLoop);
-    for (const ws of this.wss.clients) {
-      try {
-        ws.close();
-      } catch {}
+    for (const wss of this.wssList) {
+      for (const ws of wss.clients) {
+        try {
+          ws.close();
+        } catch {}
+      }
+      wss.close();
     }
-    this.wss.close();
+    this.wssList = [];
   }
 }
